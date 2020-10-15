@@ -74,3 +74,4 @@ while True:
     # 1000개 마다 pickle로 저장
     with open('cnn_feature.pickle', 'wb') as f:
         pickle.dump(storage, f)
+

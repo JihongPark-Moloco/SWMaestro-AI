@@ -33,8 +33,6 @@ def make_ins_outs(df):
 def build_model():
     model = keras.Sequential([
         layers.Dense(4096, activation='relu', input_shape=[2818]),
-        layers.Dense(4096, activation='relu'),
-        layers.Dense(2048, activation='relu'),
         layers.Dense(2048, activation='relu'),
         layers.Dense(1520, activation='relu'),
         layers.Dense(1024, activation='relu'),
@@ -98,3 +96,30 @@ his = model.fit(x=train_ins, y=train_outs,
 #
 # with open('second_train_his.pickle', 'wb') as f:
 #     pickle.dump(model.history.history, f)
+
+with open('second_train_his.pickle', 'wb') as f:
+    pickle.dump(model.history.history, f)
+
+
+with open('second_train_his.pickle', 'rb') as f:
+    his = pickle.load(f)
+
+import matplotlib.pyplot as plt
+
+# 학습 정확성 값과 검증 정확성 값을 플롯팅 합니다.
+plt.plot(his['mae'])
+plt.plot(his['val_mae'])
+plt.title('Second Model MAE')
+plt.ylabel('MAE')
+plt.xlabel('Epoch')
+plt.legend(['Train', 'Test'], loc='upper left')
+plt.show()
+
+# 학습 손실 값과 검증 손실 값을 플롯팅 합니다.
+plt.plot(his['loss'])
+plt.plot(his['val_loss'])
+plt.title('Second Model Loss')
+plt.ylabel('Loss')
+plt.xlabel('Epoch')
+plt.legend(['Train', 'Test'], loc='upper left')
+plt.show()
