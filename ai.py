@@ -1,152 +1,112 @@
-import pickle
+import io
 
+import PIL
 import keras
-import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-from keras import layers
-from sklearn.metrics import r2_score
-from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.svm import SVR
-from tqdm import tqdm
+import requests
+import tensorflow as tf
+import tensorflow_hub as hub
+import torch
 
-# roc curve,
+from kobert_transformers import get_kobert_model
+from kobert_transformers import get_tokenizer
 
-def build_model():
-    model = keras.Sequential([
-        layers.Dense(2048, activation='relu', input_shape=[2818]),
-        layers.Dense(1024, activation='relu'),
-        layers.Dense(1024, activation='relu'),
-        layers.Dense(512, activation='relu'),
-        layers.Dense(256, activation='relu'),
-        layers.Dense(64, activation='relu'),
-        layers.Dense(1)
-    ])
-    opt = keras.optimizers.Adam(learning_rate=0.00005)
-    model.compile(optimizer=opt, loss='mse')
-    return model
+cnn_model = hub.KerasLayer("https://tfhub.dev/google/bit/m-r101x1/1")
+
+tokenizer = get_tokenizer()
+nlp_model = get_kobert_model()
+nlp_model.eval()
+
+model = keras.models.load_model('first_train_model')
 
 
-with open('7000_thumbnail_feature.pickle', 'rb') as f:
-    cnn_feature = pickle.load(f)
-with open('7000_nlp_feature.pickle', 'rb') as f:
-    nlp_feature = pickle.load(f)
-
-df = pd.read_csv(r'D:\movie_channel_7000_with_subscriber.csv', error_bad_lines=False)
-df.drop(columns=['idx', 'all_keyword', 'popularity', 'logo', 'check_time', 'keywords', 'video_description', 'names'],
-        inplace=True)
-df_target = df.loc[df['subscriber_num'] != 0]
-df_target = df_target.dropna()
-df_target.info()
-
-df_target['upload_time'] = pd.to_datetime(df_target['upload_time'])
-df_target['date_delta'] = (df_target['upload_time'] - df_target['upload_time'].min()) / np.timedelta64(1, 'D')
-df_target['date_delta'] = df_target['date_delta'] / df_target['date_delta'].max()
-
-df_target['views_log'] = np.log(df_target['views'])
-df_target['views_log'] = df_target['views_log'] - df_target['views_log'].min()
-df_target['views_log'] = df_target['views_log'] / df_target['views_log'].max()
-
-df_target['views'] = df_target['views'] - df_target['views'].min()
-df_target['views'] = df_target['views'] / df_target['views'].max()
-
-df_target['subscriber_num_log'] = np.log(df_target['subscriber_num'])
-df_target['subscriber_num_log'] = df_target['subscriber_num_log'] - df_target['subscriber_num_log'].min()
-df_target['subscriber_num_log'] = df_target['subscriber_num_log'] / df_target['subscriber_num_log'].max()
-
-df_target['subscriber_num'] = df_target['subscriber_num'] - df_target['subscriber_num'].min()
-df_target['subscriber_num'] = df_target['subscriber_num'] / df_target['subscriber_num'].max()
-
-model = build_model()
-model.summary()
-
-df_train, df_test = train_test_split(df_target, test_size=0.2, shuffle=True, random_state=100)
-
-ins = []
-outs = []
-for i, r in tqdm(df_target.iterrows()):
-    video_id = r['video_id']
-    ins.append(np.concatenate((cnn_feature[video_id], nlp_feature[video_id],
-                               r['subscriber_num_log'], r['date_delta']), axis=None))
-    outs.append(r['views_log'])
-train_all_ins = np.array(ins)
-train_all_outs = np.array(outs)
-
-ins = []
-outs = []
-for i, r in tqdm(df_train.iterrows()):
-    video_id = r['video_id']
-    ins.append(np.concatenate((cnn_feature[video_id], nlp_feature[video_id],
-                               r['subscriber_num_log'], r['date_delta']), axis=None))
-    outs.append(r['views_log'])
-train_ins = np.array(ins)
-train_outs = np.array(outs)
-
-ins = []
-outs = []
-for i, r in tqdm(df_test.iterrows()):
-    video_id = r['video_id']
-    ins.append(np.concatenate((cnn_feature[video_id], nlp_feature[video_id],
-                               r['subscriber_num_log'], r['date_delta']), axis=None))
-    outs.append(r['views_log'])
-test_ins = np.array(ins)
-test_outs = np.array(outs)
-
-test_outs.max()
-plt.show()
+def preprocess_image(image):
+    image = np.array(image)
+    # reshape into shape [batch_size, height, width, num_channels]
+    img_reshaped = tf.reshape(image, [1, image.shape[0], image.shape[1], image.shape[2]])
+    # Use `convert_image_dtype` to convert to floats in the [0,1] range.
+    image = tf.image.convert_image_dtype(img_reshaped, tf.float32)
+    return image
 
 
-
-model.fit(x=train_ins, y=train_outs,
-          validation_data=(test_ins, test_outs),
-          epochs=300, batch_size=128, verbose=1)
-
-pred_outs = model.predict(test_ins)
-r2_score(test_outs, pred_outs)
-pred_outs = model.predict(train_ins)
-r2_score(train_outs, pred_outs)
-pred_outs = model.predict(train_all_ins)
-r2_score(train_all_outs, pred_outs)
-
-tt_1 = np.array([1, 2, 3])
-tt_1 = np.array([1, 2, 3])
-r2_score(tt_1, [1, 2, 3, ])
-
-svr_rbf = SVR(kernel='rbf', C=1, gamma=0.0001, epsilon=.1)
-svr_rbf.fit(train_ins, train_outs)
-print(svr_rbf.score(train_ins, train_outs))
-print(svr_rbf.score(test_ins, test_outs))
-
-param = {'C': [100, 10, 1, 0.1, 0.01, 0.001],
-         'epsilon': [100, 10, 1, 0.1, 0.01, 0.001],
-         'gamma': [100, 10, 1, 0.1, 0.01, 0.001]}
-
-modelsvr = SVR(kernel='rbf')
-
-grids = GridSearchCV(modelsvr, param, cv=3, verbose=2, n_jobs=5, scoring='r2')
-grids.fit(train_all_ins, train_all_outs)
-
-svr = SVR(C=10, gamma=0.001, kernel='rbf', epsilon=0.001)
-svr.fit(train_ins, train_outs)
-print(svr.score(train_ins, train_outs))
-print(svr.score(test_ins, test_outs))
-print(svr.score(train_all_ins, train_all_outs))
+def load_image_from_url(url):
+    """Returns an image with shape [1, height, width, num_channels]."""
+    response = requests.get(url)
+    image = PIL.Image.open(io.BytesIO(response.content))
+    image = preprocess_image(image)
+    return image
 
 
-GridSearchCV(cv=3, estimator=SVR(), n_jobs=5,
-             param_grid={'C': [100, 10, 1, 0.1, 0.01, 0.001],
-                         'epsilon': [100, 10, 1, 0.1, 0.01, 0.001],
-                         'gamma': [100, 10, 1, 0.1, 0.01, 0.001]},
-             scoring='r2', verbose=2)
-grids.best_estimator_
+def gen_attention_mask(token_ids, valid_length):
+    attention_mask = torch.zeros_like(token_ids)
+    # 배치에서 각 line들의 mask를 valid length 만큼 1로 치환
+    # ex) BERT의 입력은 64길이이고 실제 입력되는 문장이 30길이면 마스크는 '1'로 되어진 30개의 요소 + '0'으로 되어진 34개의 요소로 이루어진다.
+    for i, v in enumerate(valid_length):
+        attention_mask[i][:v] = 1
+    return attention_mask.long()
 
 
+def gen_input_ids(tokenizer, sentence):
+    target = []
+    valid_length = []
+    for s in sentence:
+        s = "[CLS] " + s
+        input_ids = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(s))
+        valid_length.append(len(input_ids))
+        target_ids = [1] * 32
+        target_ids[: len(input_ids)] = input_ids
+        target.append(target_ids)
+    return target, valid_length
 
 
-### aiai
+def do(data):
+    print(data)
+    thumbnail_url, video_name, channel_subscriber, upload_date = data
+    ## CNN do
+    # image = load_image_from_url(thumbnail_url)
+    image = load_image_from_url(r"https://i.ytimg.com/vi/iv56zLmWENA/hqdefault.jpg")
+    features = cnn_model(image)
 
+    ## NLP do
+    # input_ids, valid_length = gen_input_ids(
+    #     tokenizer=tokenizer, sentence=[video_name]
+    # )
+    input_ids, valid_length = gen_input_ids(
+        tokenizer=tokenizer, sentence=["헐 스시 존맛탱"]
+    )
+    input_ids = torch.LongTensor(input_ids)
 
-with open('7000_thumbnail_feature.pickle', 'rb') as f:
-    cnn_feature = pickle.load(f)
-with open('7000_nlp_feature.pickle', 'rb') as f:
-    nlp_feature = pickle.load(f)
+    # attention mask 생성, 토큰 길이만큼 1 입력 그 이외에는 0
+    attention_mask = gen_attention_mask(input_ids, valid_length)
+
+    # 문장의 유형을 구분 ex) context:0, question:1 , 여기는 제목뿐이므로 0
+    token_type_ids = torch.zeros_like(input_ids)
+
+    _, pooled_output = nlp_model(input_ids, attention_mask, token_type_ids)
+    pooled_output = pooled_output.cpu().detach().numpy()
+
+    ## etc do
+    processed_channel_subscriber = np.log(int(channel_subscriber)) - 8.573573524852344
+    if processed_channel_subscriber < 0:
+        print("Warning: processed_channel_subscriber is minus!!")
+
+    def do_predict(processed_upload_date):
+        model_input = np.concatenate((features, pooled_output,
+                                      processed_channel_subscriber, processed_upload_date), axis=None)
+
+        predicted_views_log = model.predict(np.array([model_input]))
+        views_log = 2 ** (predicted_views_log[0][0] * 17.977546369374885 + 6.90875477931522)
+        return views_log
+
+    # 1.0 == 1000일
+    views = []
+
+    views.append(do_predict(30.0))
+    views.append(do_predict(25.0))
+    views.append(do_predict(20.0))
+    views.append(do_predict(15.0))
+    views.append(do_predict(10.0))
+    views.append(do_predict(5.0))
+    views.append(do_predict(0.0))
+
+    return views
