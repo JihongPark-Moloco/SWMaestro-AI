@@ -1,18 +1,23 @@
 import json
+
 import pika
+
 import ai
-
-
 
 
 def callback(ch, method, properties, body):
     print(" [x] Received %r" % body.decode())
-    method_frame, header_frame, data = channel.basic_get(queue=body.decode())
-    data = json.loads(data)
-    channel.queue_delete(queue=body.decode())
-    # data = [thumbnail_url, video_name, channel_subscriber, upload_date]
-    views = ai.do(data)
-    channel.basic_publish(exchange="", routing_key=body.decode() + "_r", body=json.dumps(views))
+    try:
+        method_frame, header_frame, data = channel.basic_get(queue=body.decode())
+        data = json.loads(data)
+        channel.queue_delete(queue=body.decode())
+        # data = [thumbnail_url, video_name, channel_subscriber, upload_date]
+        views = ai.do(data)
+        channel.basic_publish(exchange="", routing_key=body.decode() + "_r", body=json.dumps(views))
+    except Exception as e:
+        print(e)
+        channel.queue_delete(queue=body.decode())
+        channel.queue_delete(queue=body.decode() + "_r")
 
 
 credentials = pika.PlainCredentials("muna", "muna112358!")

@@ -1,3 +1,4 @@
+import base64
 import io
 
 import PIL
@@ -7,6 +8,7 @@ import requests
 import tensorflow as tf
 import tensorflow_hub as hub
 import torch
+from PIL import Image
 
 from kobert_transformers import get_kobert_model
 from kobert_transformers import get_tokenizer
@@ -17,7 +19,7 @@ tokenizer = get_tokenizer()
 nlp_model = get_kobert_model()
 nlp_model.eval()
 
-model = keras.models.load_model('first_train_model')
+model = keras.models.load_model("first_train_model")
 
 
 def preprocess_image(image):
@@ -31,8 +33,16 @@ def preprocess_image(image):
 
 def load_image_from_url(url):
     """Returns an image with shape [1, height, width, num_channels]."""
-    response = requests.get(url)
-    image = PIL.Image.open(io.BytesIO(response.content))
+    if r"data:image/png;base64" in url:
+        image = base64.b64decode(url.split(",")[1])
+        image = PIL.Image.open(io.BytesIO(image))
+        image = image.convert("RGB")
+    elif r"data:image/jpeg;base64" in url:
+        image = base64.b64decode(url.split(",")[1])
+        image = PIL.Image.open(io.BytesIO(image))
+    else:
+        response = requests.get(url)
+        image = PIL.Image.open(io.BytesIO(response.content))
     image = preprocess_image(image)
     return image
 
@@ -63,17 +73,15 @@ def do(data):
     print(data)
     thumbnail_url, video_name, channel_subscriber, upload_date = data
     ## CNN do
-    # image = load_image_from_url(thumbnail_url)
-    image = load_image_from_url(r"https://i.ytimg.com/vi/iv56zLmWENA/hqdefault.jpg")
+    image = load_image_from_url(thumbnail_url)
+    # image = load_image_from_url(r"https://i.ytimg.com/vi/iv56zLmWENA/hqdefault.jpg")
     features = cnn_model(image)
 
     ## NLP do
+    input_ids, valid_length = gen_input_ids(tokenizer=tokenizer, sentence=[video_name])
     # input_ids, valid_length = gen_input_ids(
-    #     tokenizer=tokenizer, sentence=[video_name]
+    #     tokenizer=tokenizer, sentence=["헐 스시 존맛탱"]
     # )
-    input_ids, valid_length = gen_input_ids(
-        tokenizer=tokenizer, sentence=["헐 스시 존맛탱"]
-    )
     input_ids = torch.LongTensor(input_ids)
 
     # attention mask 생성, 토큰 길이만큼 1 입력 그 이외에는 0
@@ -91,8 +99,10 @@ def do(data):
         print("Warning: processed_channel_subscriber is minus!!")
 
     def do_predict(processed_upload_date):
-        model_input = np.concatenate((features, pooled_output,
-                                      processed_channel_subscriber, processed_upload_date), axis=None)
+        model_input = np.concatenate(
+            (features, pooled_output, processed_channel_subscriber, processed_upload_date),
+            axis=None,
+        )
 
         predicted_views_log = model.predict(np.array([model_input]))
         views_log = 2 ** (predicted_views_log[0][0] * 17.977546369374885 + 6.90875477931522)
