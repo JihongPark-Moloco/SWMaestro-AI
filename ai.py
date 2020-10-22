@@ -1,6 +1,6 @@
 import base64
 import io
-
+import time
 import PIL
 import keras
 import numpy as np
@@ -70,7 +70,7 @@ def gen_input_ids(tokenizer, sentence):
 
 
 def do(data):
-    print(data)
+    print(time.ctime(), data)
     thumbnail_url, video_name, channel_subscriber, upload_date = data
     ## CNN do
     image = load_image_from_url(thumbnail_url)
@@ -111,12 +111,21 @@ def do(data):
     # 1.0 == 1000일
     views = []
 
-    views.append(do_predict(30.0))
-    views.append(do_predict(25.0))
-    views.append(do_predict(20.0))
-    views.append(do_predict(15.0))
-    views.append(do_predict(10.0))
-    views.append(do_predict(5.0))
-    views.append(do_predict(0.0))
+
+    moment = 30.0
+    while moment >= 11.0:
+        views.append(do_predict(moment))
+        moment -= 0.63
+
 
     return views
+#
+#
+# data = [
+#     r'https://i.ytimg.com/vi/hQ_AZ1i-wsY/hqdefault.jpg',
+#     '[LOL] 아니 어떻게 치킨에 콜라를 뿌려먹으아아악',
+#     '184000',
+#     '2020-09-84'
+# ]
+#
+# print(len(do(data)))
