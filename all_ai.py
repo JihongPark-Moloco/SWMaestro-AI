@@ -6,12 +6,16 @@ import pandas as pd
 from keras import layers
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
+import psycopg2 as pg2
+from matplotlib import pyplot as plt
 
 # 기추출한 cnn/nlp 피쳐 불러오기
-with open('cnn_feature.pickle', 'rb') as f:
+with open('cnn_feature_a_b.pickle', 'rb') as f:
     cnn_feature = pickle.load(f)
-with open('nlp_feature.pickle', 'rb') as f:
+with open('nlp_feature_a_b.pickle', 'rb') as f:
     nlp_feature = pickle.load(f)
+with open('2_14_videos.pickle', 'rb') as f:
+    a_b = pickle.load(f)
 
 # 입력한 데이터프레임의 각 row의 영상의 cnn, nlp를 concat하여 하나의 벡터로 array화
 def make_ins_outs(df):
@@ -48,17 +52,39 @@ def build_model():
 
 
 # 구독자수가 공개된 채널에 대한 영상만 수집
-df = pd.read_csv(r'D:\all_ai.csv', error_bad_lines=False)
+conn = pg2.connect(
+    database="createtrend",
+    user="muna",
+    password="muna112358!",
+    host="ec2-13-124-107-195.ap-northeast-2.compute.amazonaws.com",
+    port="5432",
+)
+df = pd.read_sql(f"""
+SELECT v.idx, v.video_id, v.upload_time, vv.check_time, vv.views, c.subscriber_num FROM video v 
+JOIN video_views vv on v.idx = vv.video_idx JOIN channel c on v.channel_idx = c.idx
+WHERE c.subscriber_num != 0 AND v.idx IN ({",".join(map(str, a_b))})""", con=conn)
+# df = pd.read_csv(r'D:\all_ai.csv', error_bad_lines=False)
 df = df.drop(df.loc[df['views'] <= 1000].index)  # 조회수가 1000회 미만인 영상 삭제
-df = df.drop(df.sort_values('views').tail(11).index)  # 조회수가 특이하게 높은 이상치 데이터 삭제
+
+# df.sort_values('views').tail(8)
+df = df.drop(
+    df.loc[
+        df['video_id'].isin(['MZ4JGye4dQU', 'HPQ5mqovXHo', 'wTowEKjDGkU'])
+    ].index
+)
+# df = df.drop(df.sort_values('views').tail(11).index)  # 조회수가 특이하게 높은 이상치 데이터 삭제
 
 # 영상이 업로드 된 시점까지를 0~1의 값으로 normalize
 df['upload_time'] = pd.to_datetime(df['upload_time'])
-df['date_delta'] = (df['upload_time'] - df['upload_time'].min()) / np.timedelta64(1, 'D')
-df['date_delta'] = df['date_delta'] / df['date_delta'].max()
+df['date_delta'] = (df['check_time'] - df['upload_time']) / np.timedelta64(1, 'D')
+date_delta_min = df['date_delta'].min()
+df['date_delta'] = df['date_delta'] - date_delta_min
+date_delta_max = df['date_delta'].max()
+df['date_delta'] = df['date_delta'] / date_delta_max
 
 # 영상의 조회수에 log 함수 적용, 0~1로 normalize
 df['views_log'] = np.log(df['views'])
+
 df['views_log'] = df['views_log'] - df['views_log'].min()
 df['views_log'] = df['views_log'] / df['views_log'].max()
 
@@ -82,8 +108,8 @@ train_ins, train_outs = make_ins_outs(df_train)
 test_ins, test_outs = make_ins_outs(df_test)
 
 # 제작한 학습용 데이터 저장
-# with open('data_prepare.pickle', 'wb') as f:
-#     pickle.dump([train_all_ins, train_all_outs, train_ins, train_outs, test_ins, test_outs], f, protocol=4)
+with open('data_prepare.pickle_2_14', 'wb') as f:
+    pickle.dump([train_all_ins, train_all_outs, train_ins, train_outs, test_ins, test_outs], f, protocol=4)
 
 model = build_model()
 model.summary()
@@ -92,15 +118,15 @@ his = model.fit(x=train_ins, y=train_outs,
                 validation_data=(test_ins, test_outs),
                 epochs=200, batch_size=256, verbose=1)
 
-# model.save('second_train_model')
+model.save('third_train_model')
+
+with open('third_train_his.pickle', 'wb') as f:
+    pickle.dump(model.history.history, f)
 #
 # with open('second_train_his.pickle', 'wb') as f:
 #     pickle.dump(model.history.history, f)
 
-with open('second_train_his.pickle', 'wb') as f:
-    pickle.dump(model.history.history, f)
-
-
+his = model.history.history
 with open('second_train_his.pickle', 'rb') as f:
     his = pickle.load(f)
 

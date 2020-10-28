@@ -19,7 +19,7 @@ tokenizer = get_tokenizer()
 nlp_model = get_kobert_model()
 nlp_model.eval()
 
-model = keras.models.load_model("first_train_model")
+model = keras.models.load_model("third_train_model")
 
 
 def preprocess_image(image):
@@ -94,7 +94,8 @@ def do(data):
     pooled_output = pooled_output.cpu().detach().numpy()
 
     ## etc do
-    processed_channel_subscriber = np.log(int(channel_subscriber)) - 8.573573524852344
+    # processed_channel_subscriber = np.log(int(channel_subscriber)) - 8.573573524852344
+    processed_channel_subscriber = (int(channel_subscriber) - 5460) / 52000000
     if processed_channel_subscriber < 0:
         print("Warning: processed_channel_subscriber is minus!!")
 
@@ -105,17 +106,18 @@ def do(data):
         )
 
         predicted_views_log = model.predict(np.array([model_input]))
-        views_log = 2 ** (predicted_views_log[0][0] * 17.977546369374885 + 6.90875477931522)
+        views_log = 2 ** (predicted_views_log[0][0] * 15.991391187446492 + 6.90875477931522)
         return views_log
 
     # 1.0 == 1000일
     views = []
 
+    views.append(0.0)
 
-    moment = 30.0
-    while moment >= 11.0:
+    moment = 0.0
+    while moment <= 0.647:
         views.append(do_predict(moment))
-        moment -= 0.63
+        moment += 0.0231
 
 
     return views
@@ -127,5 +129,6 @@ def do(data):
 #     '184000',
 #     '2020-09-84'
 # ]
+# do(data)
 #
 # print(len(do(data)))

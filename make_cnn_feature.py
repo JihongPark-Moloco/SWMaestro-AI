@@ -27,6 +27,7 @@ def load_image_from_url(url):
     image = preprocess_image(image)
     return image
 
+
 # 구글 Big Transfer m-r101x1 모델 로드 (pre trained)
 module = hub.KerasLayer("https://tfhub.dev/google/bit/m-r101x1/1")
 
@@ -36,42 +37,42 @@ storage = {}
 # with open('cnn_feature.pickle', 'rb') as f:
 #     storage = pickle.load(f)
 
-while True:
-    conn = pg2.connect(
-        database="createtrend",
-        user="muna",
-        password="muna112358!",
-        host="ec2-13-124-107-195.ap-northeast-2.compute.amazonaws.com",
-        port="5432",
-    )
-    cur = conn.cursor()
-    
-    # DB에서 1000개 row 가져오기
-    df = pd.read_sql("""
-    SELECT video_id, v.thumbnail_url
-    FROM video v
-             JOIN channel c on c.idx = v.channel_idx
-    WHERE v.processed_cnn = false
-      AND v.status = True
-      AND v.forbidden = false AND c.subscriber_num is not null AND c.subscriber_num != 0 LIMIT 1000;
+with open('2_14_videos.pickle', 'rb') as f:
+    a_b = pickle.load(f)
+# while True:
+conn = pg2.connect(
+    database="createtrend",
+    user="muna",
+    password="muna112358!",
+    host="ec2-13-124-107-195.ap-northeast-2.compute.amazonaws.com",
+    port="5432",
+)
+cur = conn.cursor()
+
+# DB에서 1000개 row 가져오기
+df = pd.read_sql(f"""
+    SELECT idx, video_id, thumbnail_url FROM video WHERE idx IN ({",".join(map(str, a_b))})
       """, con=conn)
 
-    for i, r in tqdm(df.iterrows()):
-        try:
-            image = load_image_from_url(r['thumbnail_url'])
-            features = module(image)
-            # dict 타입으로 저장
-            storage[r['video_id']] = features.numpy()
-            # DB에 cnn 피쳐 추출로 컬럼 업데이트
-            cur.execute(f"UPDATE video SET processed_cnn = true WHERE video_id = '{r['video_id']}'")
-        except Exception as e:
-            print(e)
-            pass
+for i, r in tqdm(df.iterrows()):
+    try:
+        image = load_image_from_url(r['thumbnail_url'])
+        features = module(image)
+        # dict 타입으로 저장
+        storage[r['video_id']] = features.numpy()
+        # DB에 cnn 피쳐 추출로 컬럼 업데이트
+    except Exception as e:
+        print(e)
+        pass
 
-    conn.commit()
-    conn.close()
-    
-    # 1000개 마다 pickle로 저장
-    with open('cnn_feature.pickle', 'wb') as f:
-        pickle.dump(storage, f)
+conn.commit()
+conn.close()
 
+# 1000개 마다 pickle로 저장
+with open('cnn_feature_a_b.pickle', 'wb') as f:
+    pickle.dump(storage, f)
+
+
+image = load_image_from_url(list(df.loc[df['video_id'] == 'Q3fNEL4DMrY', 'thumbnail_url'])[0])
+features = module(image)
+storage[df.loc[df['video_id'] == 'Q3fNEL4DMrY', 'video_id'].item()] = features.numpy()
