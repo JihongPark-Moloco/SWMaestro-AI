@@ -115,10 +115,11 @@ def do(data):
     views.append(0.0)
 
     moment = 0.0
-    while moment <= 0.647:
+    while moment <= 0.67:
         views.append(do_predict(moment))
         moment += 0.0231
 
+    print(views)
 
     return views
 #
