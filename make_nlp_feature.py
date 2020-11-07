@@ -1,3 +1,8 @@
+"""
+조회수 예측 AI 모델 학습 데이터를 생성하는 소스입니다.
+NLP 네트워크를 통해 영상 제목 피쳐를 추출해 저장합니다.
+"""
+
 import pickle
 
 import pandas as pd
@@ -26,7 +31,7 @@ def gen_input_ids(tokenizer, sentence):
         input_ids = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(s))
         valid_length.append(len(input_ids))
         target_ids = [1] * 32
-        target_ids[:len(input_ids)] = input_ids
+        target_ids[: len(input_ids)] = input_ids
         target.append(target_ids)
     return target, valid_length
 
@@ -37,7 +42,7 @@ storage = {}
 # with open('nlp_feature.pickle', 'rb') as f:
 #     storage = pickle.load(f)
 
-with open('2_14_videos.pickle', 'rb') as f:
+with open("2_14_videos.pickle", "rb") as f:
     a_b = pickle.load(f)
 
 tokenizer = get_tokenizer()
@@ -54,24 +59,23 @@ conn = pg2.connect(
     port="5432",
 )
 cur = conn.cursor()
-# DB에서 1000개 row 가져오기
-# df = pd.read_sql("""
-# SELECT video_id, v.video_name
-# FROM video v
-#          JOIN channel c on c.idx = v.channel_idx
-# WHERE v.processed_nlp = false
-#   AND v.status = True
-#   AND v.forbidden = false AND c.subscriber_num is not null AND c.subscriber_num != 0 LIMIT 1000;
-#   """, con=conn)
 
 # DB에서 1000개 row 가져오기
-df = pd.read_sql(f"""
-SELECT idx, video_id, video_name FROM video WHERE idx IN ({",".join(map(str, a_b))})
-      """, con=conn)
+df = pd.read_sql(
+    """
+SELECT video_id, v.video_name
+FROM video v
+         JOIN channel c on c.idx = v.channel_idx
+WHERE v.processed_nlp = false
+  AND v.status = True
+  AND v.forbidden = false AND c.subscriber_num is not null AND c.subscriber_num != 0 LIMIT 1000;
+  """,
+    con=conn,
+)
 
 for i, r in tqdm(df.iterrows()):
     # 32개 길이의 토큰 생성
-    input_ids, valid_length = gen_input_ids(tokenizer=tokenizer, sentence=[r['video_name']])
+    input_ids, valid_length = gen_input_ids(tokenizer=tokenizer, sentence=[r["video_name"]])
     input_ids = torch.LongTensor(input_ids).cuda()
 
     # attention mask 생성, 토큰 길이만큼 1 입력 그 이외에는 0
@@ -81,15 +85,15 @@ for i, r in tqdm(df.iterrows()):
     token_type_ids = torch.zeros_like(input_ids).cuda()
 
     sequence_output, pooled_output = model(input_ids, attention_mask, token_type_ids)
-    storage[r['video_id']] = pooled_output.cpu().detach().numpy()
+    storage[r["video_id"]] = pooled_output.cpu().detach().numpy()
     del input_ids, attention_mask, token_type_ids
 
     # DB에 nlp 처리 컬럼 업데이트
-    # cur.execute(f"UPDATE video SET processed_nlp = true WHERE video_id = '{r['video_id']}'")
+    cur.execute(f"UPDATE video SET processed_nlp = true WHERE video_id = '{r['video_id']}'")
 
 conn.commit()
 conn.close()
 
 # 1000개 단위로 저장
-with open('nlp_feature_a_b.pickle', 'wb') as f:
+with open("nlp_feature_a_b.pickle", "wb") as f:
     pickle.dump(storage, f)

@@ -1,3 +1,8 @@
+"""
+서버에서 오는 요청을 처리하기 위한 AI 서버 구동 코드입니다.
+RabbitMQ를 이용해서 통신합니다.
+"""
+
 import json
 
 import pika
@@ -11,7 +16,6 @@ def callback(ch, method, properties, body):
         method_frame, header_frame, data = channel.basic_get(queue=body.decode())
         data = json.loads(data)
         channel.queue_delete(queue=body.decode())
-        # data = [thumbnail_url, video_name, channel_subscriber, upload_date]
         views = ai.do(data)
         channel.basic_publish(exchange="", routing_key=body.decode() + "_r", body=json.dumps(views))
     except Exception as e:

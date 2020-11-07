@@ -1,6 +1,12 @@
+"""
+학습된 모델을 불러와 웹서버에서 오는 분석 요청을 수행합니다.
+예측된 조회수가 담긴 리스트를 반환합니다.
+"""
+
 import base64
 import io
 import time
+
 import PIL
 import keras
 import numpy as np
@@ -13,12 +19,15 @@ from PIL import Image
 from kobert_transformers import get_kobert_model
 from kobert_transformers import get_tokenizer
 
+# CNN 모델 로드
 cnn_model = hub.KerasLayer("https://tfhub.dev/google/bit/m-r101x1/1")
 
+# NLP 모델 및 토크나이저 로드
 tokenizer = get_tokenizer()
 nlp_model = get_kobert_model()
 nlp_model.eval()
 
+# 조회수 예측 모델 로드
 model = keras.models.load_model("third_train_model")
 
 
@@ -74,14 +83,10 @@ def do(data):
     thumbnail_url, video_name, channel_subscriber, upload_date = data
     ## CNN do
     image = load_image_from_url(thumbnail_url)
-    # image = load_image_from_url(r"https://i.ytimg.com/vi/iv56zLmWENA/hqdefault.jpg")
     features = cnn_model(image)
 
     ## NLP do
     input_ids, valid_length = gen_input_ids(tokenizer=tokenizer, sentence=[video_name])
-    # input_ids, valid_length = gen_input_ids(
-    #     tokenizer=tokenizer, sentence=["헐 스시 존맛탱"]
-    # )
     input_ids = torch.LongTensor(input_ids)
 
     # attention mask 생성, 토큰 길이만큼 1 입력 그 이외에는 0
@@ -122,14 +127,3 @@ def do(data):
     print(views)
 
     return views
-#
-#
-# data = [
-#     r'https://i.ytimg.com/vi/hQ_AZ1i-wsY/hqdefault.jpg',
-#     '[LOL] 아니 어떻게 치킨에 콜라를 뿌려먹으아아악',
-#     '184000',
-#     '2020-09-84'
-# ]
-# do(data)
-#
-# print(len(do(data)))

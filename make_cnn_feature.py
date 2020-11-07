@@ -1,3 +1,8 @@
+"""
+조회수 예측 AI 모델 학습 데이터를 생성하는 소스입니다.
+CNN 네트워크를 통해 썸네일 피쳐를 추출해 저장합니다.
+"""
+
 import io
 import pickle
 
@@ -37,7 +42,7 @@ storage = {}
 # with open('cnn_feature.pickle', 'rb') as f:
 #     storage = pickle.load(f)
 
-with open('2_14_videos.pickle', 'rb') as f:
+with open("2_14_videos.pickle", "rb") as f:
     a_b = pickle.load(f)
 # while True:
 conn = pg2.connect(
@@ -50,16 +55,19 @@ conn = pg2.connect(
 cur = conn.cursor()
 
 # DB에서 1000개 row 가져오기
-df = pd.read_sql(f"""
+df = pd.read_sql(
+    f"""
     SELECT idx, video_id, thumbnail_url FROM video WHERE idx IN ({",".join(map(str, a_b))})
-      """, con=conn)
+      """,
+    con=conn,
+)
 
 for i, r in tqdm(df.iterrows()):
     try:
-        image = load_image_from_url(r['thumbnail_url'])
+        image = load_image_from_url(r["thumbnail_url"])
         features = module(image)
         # dict 타입으로 저장
-        storage[r['video_id']] = features.numpy()
+        storage[r["video_id"]] = features.numpy()
         # DB에 cnn 피쳐 추출로 컬럼 업데이트
     except Exception as e:
         print(e)
@@ -69,10 +77,5 @@ conn.commit()
 conn.close()
 
 # 1000개 마다 pickle로 저장
-with open('cnn_feature_a_b.pickle', 'wb') as f:
+with open("cnn_feature_a_b.pickle", "wb") as f:
     pickle.dump(storage, f)
-
-
-image = load_image_from_url(list(df.loc[df['video_id'] == 'Q3fNEL4DMrY', 'thumbnail_url'])[0])
-features = module(image)
-storage[df.loc[df['video_id'] == 'Q3fNEL4DMrY', 'video_id'].item()] = features.numpy()

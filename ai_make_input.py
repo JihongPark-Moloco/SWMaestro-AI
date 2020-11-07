@@ -1,3 +1,8 @@
+"""
+조회수 예측 모델 AI 학습을 위한 데이터셋을 생성하는 소스입니다.
+CNN으로 썸네일을 NLP로 영상 제목을 벡터화해 pickle 파일로 저장합니다.
+"""
+
 import torch
 
 
@@ -18,7 +23,7 @@ def gen_input_ids(tokenizer, sentence):
         input_ids = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(s))
         valid_length.append(len(input_ids))
         target_ids = [1] * 32
-        target_ids[:len(input_ids)] = input_ids
+        target_ids[: len(input_ids)] = input_ids
         target.append(target_ids)
     return target, valid_length
 
@@ -27,7 +32,9 @@ from kobert_transformers import get_kobert_model
 from kobert_transformers import get_tokenizer
 
 tokenizer = get_tokenizer()
-input_ids, valid_length = gen_input_ids(tokenizer=tokenizer, sentence=["한국어 모델을 공유합니다.", "두번째 문장입니다."])
+input_ids, valid_length = gen_input_ids(
+    tokenizer=tokenizer, sentence=["한국어 모델을 공유합니다.", "두번째 문장입니다."]
+)
 
 model = get_kobert_model()
 model.eval()
@@ -91,7 +98,7 @@ from tqdm import tqdm
 
 storage = {}
 
-with open('cnn_feature.pickle', 'rb') as f:
+with open("cnn_feature.pickle", "rb") as f:
     storage = pickle.load(f)
 
 conn = pg2.connect(
@@ -116,20 +123,23 @@ while True:
         port="5432",
     )
     cur = conn.cursor()
-    df = pd.read_sql("""
+    df = pd.read_sql(
+        """
     SELECT video_id, v.thumbnail_url
     FROM video v
              JOIN channel c on c.idx = v.channel_idx
     WHERE v.processed_cnn = false
       AND v.status = True
       AND v.forbidden = false AND c.subscriber_num is not null AND c.subscriber_num != 0 LIMIT 1000;
-      """, con=conn)
+      """,
+        con=conn,
+    )
 
     for i, r in tqdm(df.iterrows()):
         try:
-            image = load_image_from_url(r['thumbnail_url'])
+            image = load_image_from_url(r["thumbnail_url"])
             features = module(image)
-            storage[r['video_id']] = features.numpy()
+            storage[r["video_id"]] = features.numpy()
             cur.execute(f"UPDATE video SET processed_cnn = true WHERE video_id = '{r['video_id']}'")
         except Exception as e:
             print(e)
@@ -138,13 +148,13 @@ while True:
     conn.commit()
     conn.close()
 
-    with open('cnn_feature.pickle', 'wb') as f:
+    with open("cnn_feature.pickle", "wb") as f:
         pickle.dump(storage, f)
 
 import pandas as pd
 from tqdm import tqdm
 
-df = pd.read_csv(r'D:\movie_channel_target_7000.csv')
+df = pd.read_csv(r"D:\movie_channel_target_7000.csv")
 storage = {}
 tokenizer = get_tokenizer()
 model = get_kobert_model()
@@ -152,18 +162,16 @@ model = model.cuda()
 model.eval()
 
 for i, r in tqdm(df.iterrows()):
-    input_ids, valid_length = gen_input_ids(tokenizer=tokenizer, sentence=[r['video_name']])
+    input_ids, valid_length = gen_input_ids(tokenizer=tokenizer, sentence=[r["video_name"]])
     input_ids = torch.LongTensor(input_ids).cuda()
     attention_mask = gen_attention_mask(input_ids, valid_length)
     token_type_ids = torch.zeros_like(input_ids).cuda()
     sequence_output, pooled_output = model(input_ids, attention_mask, token_type_ids)
-    storage[r['video_id']] = pooled_output.cpu().detach().numpy()
+    storage[r["video_id"]] = pooled_output.cpu().detach().numpy()
     del input_ids, attention_mask, token_type_ids
 
-with open('7000_nlp_feature.pickle', 'wb') as f:
+with open("7000_nlp_feature.pickle", "wb") as f:
     pickle.dump(storage, f)
-
-
 
 ### NLP 준비
 
@@ -174,7 +182,7 @@ from tqdm import tqdm
 
 storage = {}
 
-with open('nlp_feature.pickle', 'rb') as f:
+with open("nlp_feature.pickle", "rb") as f:
     storage = pickle.load(f)
 
 while True:
@@ -186,27 +194,30 @@ while True:
         port="5432",
     )
     cur = conn.cursor()
-    df = pd.read_sql("""
+    df = pd.read_sql(
+        """
     SELECT video_id, v.video_name
     FROM video v
              JOIN channel c on c.idx = v.channel_idx
     WHERE v.processed_nlp = false
       AND v.status = True
       AND v.forbidden = false AND c.subscriber_num is not null AND c.subscriber_num != 0 LIMIT 1000;
-      """, con=conn)
+      """,
+        con=conn,
+    )
 
     for i, r in tqdm(df.iterrows()):
-        input_ids, valid_length = gen_input_ids(tokenizer=tokenizer, sentence=[r['video_name']])
+        input_ids, valid_length = gen_input_ids(tokenizer=tokenizer, sentence=[r["video_name"]])
         input_ids = torch.LongTensor(input_ids).cuda()
         attention_mask = gen_attention_mask(input_ids, valid_length)
         token_type_ids = torch.zeros_like(input_ids).cuda()
         sequence_output, pooled_output = model(input_ids, attention_mask, token_type_ids)
-        storage[r['video_id']] = pooled_output.cpu().detach().numpy()
+        storage[r["video_id"]] = pooled_output.cpu().detach().numpy()
         del input_ids, attention_mask, token_type_ids
         cur.execute(f"UPDATE video SET processed_nlp = true WHERE video_id = '{r['video_id']}'")
 
     conn.commit()
     conn.close()
 
-    with open('nlp_feature.pickle', 'wb') as f:
+    with open("nlp_feature.pickle", "wb") as f:
         pickle.dump(storage, f)
