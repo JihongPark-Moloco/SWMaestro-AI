@@ -98,7 +98,7 @@ from tqdm import tqdm
 
 storage = {}
 
-with open("cnn_feature.pickle", "rb") as f:
+with open("../cnn_feature.pickle", "rb") as f:
     storage = pickle.load(f)
 
 conn = pg2.connect(
@@ -148,7 +148,7 @@ while True:
     conn.commit()
     conn.close()
 
-    with open("cnn_feature.pickle", "wb") as f:
+    with open("../cnn_feature.pickle", "wb") as f:
         pickle.dump(storage, f)
 
 import pandas as pd
@@ -170,7 +170,7 @@ for i, r in tqdm(df.iterrows()):
     storage[r["video_id"]] = pooled_output.cpu().detach().numpy()
     del input_ids, attention_mask, token_type_ids
 
-with open("7000_nlp_feature.pickle", "wb") as f:
+with open("../7000_nlp_feature.pickle", "wb") as f:
     pickle.dump(storage, f)
 
 ### NLP 준비
@@ -182,7 +182,7 @@ from tqdm import tqdm
 
 storage = {}
 
-with open("nlp_feature.pickle", "rb") as f:
+with open("../nlp_feature.pickle", "rb") as f:
     storage = pickle.load(f)
 
 while True:
@@ -219,5 +219,5 @@ while True:
     conn.commit()
     conn.close()
 
-    with open("nlp_feature.pickle", "wb") as f:
+    with open("../nlp_feature.pickle", "wb") as f:
         pickle.dump(storage, f)

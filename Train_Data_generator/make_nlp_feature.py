@@ -42,7 +42,7 @@ storage = {}
 # with open('nlp_feature.pickle', 'rb') as f:
 #     storage = pickle.load(f)
 
-with open("2_14_videos.pickle", "rb") as f:
+with open("../2_14_videos.pickle", "rb") as f:
     a_b = pickle.load(f)
 
 tokenizer = get_tokenizer()
@@ -95,5 +95,5 @@ conn.commit()
 conn.close()
 
 # 1000개 단위로 저장
-with open("nlp_feature_a_b.pickle", "wb") as f:
+with open("../nlp_feature_a_b.pickle", "wb") as f:
     pickle.dump(storage, f)

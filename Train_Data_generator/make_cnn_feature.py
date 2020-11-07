@@ -42,7 +42,7 @@ storage = {}
 # with open('cnn_feature.pickle', 'rb') as f:
 #     storage = pickle.load(f)
 
-with open("2_14_videos.pickle", "rb") as f:
+with open("../2_14_videos.pickle", "rb") as f:
     a_b = pickle.load(f)
 # while True:
 conn = pg2.connect(
@@ -77,5 +77,5 @@ conn.commit()
 conn.close()
 
 # 1000개 마다 pickle로 저장
-with open("cnn_feature_a_b.pickle", "wb") as f:
+with open("../cnn_feature_a_b.pickle", "wb") as f:
     pickle.dump(storage, f)
