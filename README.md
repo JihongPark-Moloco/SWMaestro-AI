@@ -49,3 +49,6 @@ MUNA 팀의 CreateTrend 프로젝트에서 영상의 트렌드 정보를 분석�
 ![YouTube Recommendation System](/uploads/6d9945bfbd429ecd6fd67d842e3c2e7b/image.png)  
 [Deep Neural Networks for YouTube Recommendations](https://dl.acm.org/doi/abs/10.1145/2959100.2959190)  
 본 네트워크를 참조해 영상 조회수 예측 모델을 구현하였습니다.
+
+## Authors
+- **박지홍(qkrwlghddlek@naver.com)**
