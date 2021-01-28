@@ -69,11 +69,11 @@ def build_model():
 
 # 구독자수가 공개된 채널에 대한 영상만 수집
 conn = pg2.connect(
-    database="createtrend",
-    user="muna",
-    password="muna112358!",
-    host="ec2-13-124-107-195.ap-northeast-2.compute.amazonaws.com",
-    port="5432",
+    database=None,
+    user=None,
+    password=None,
+    host=None,
+    port=None,
 )
 df = pd.read_sql(
     f"""
