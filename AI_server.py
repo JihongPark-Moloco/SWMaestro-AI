@@ -24,10 +24,10 @@ def callback(ch, method, properties, body):
         channel.queue_delete(queue=body.decode() + "_r")
 
 
-credentials = pika.PlainCredentials("muna", "muna112358!")
+credentials = pika.PlainCredentials(None, None)
 connection = pika.BlockingConnection(
     pika.ConnectionParameters(
-        "13.124.107.195", 5672, "/", credentials, heartbeat=10, blocked_connection_timeout=10,
+        None, None, "/", credentials, heartbeat=10, blocked_connection_timeout=10,
     )
 )
 
